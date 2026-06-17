@@ -1,25 +1,35 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 
-// ═════════════════════════════════════════════════════════════
-//  CONFIGURATION — modifiez ces deux constantes
-// ═════════════════════════════════════════════════════════════
-//  Fichier JSON des taux Square (marché parallèle) que VOUS contrôlez.
-//  Remplacez par l'URL "raw" de votre dépôt GitHub :
+// âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+//  CONFIGURATION â modifiez ces deux constantes
+// âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 const SQUARE_URL =
   "https://raw.githubusercontent.com/FSH27/DinarTaux/main/square-rates.json";
 
-//  API gratuite Frankfurter (banques centrales) — taux officiel. Aucune clé requise.
 const OFFICIAL_API = "https://api.frankfurter.dev/v2";
 
-const CODES = ["EUR", "USD", "GBP", "CAD"];
+// Currencies with Square (parallel market) rates
+const SQUARE_CODES = ["EUR", "USD", "GBP", "CAD"];
+// All 12 currencies
+const CODES = ["EUR", "USD", "GBP", "CAD", "JPY", "TRY", "SAR", "AED", "MAD", "TND", "CHF", "CNY"];
+// Codes Frankfurter can provide (ECB-tracked, excluding EUR base & non-ECB currencies)
+const FKFR_CODES = ["USD", "GBP", "CAD", "JPY", "TRY", "CHF", "CNY"];
+
 const META = {
-  EUR: { name: "Euro", flag: "https://flagcdn.com/w80/eu.png" },
-  USD: { name: "Dollar US", flag: "https://flagcdn.com/w80/us.png" },
-  GBP: { name: "Livre Sterling", flag: "https://flagcdn.com/w80/gb.png" },
-  CAD: { name: "Dollar canadien", flag: "https://flagcdn.com/w80/ca.png" },
+  EUR: { name: "Euro",             flag: "https://flagcdn.com/w80/eu.png" },
+  USD: { name: "Dollar US",        flag: "https://flagcdn.com/w80/us.png" },
+  GBP: { name: "Livre Sterling",   flag: "https://flagcdn.com/w80/gb.png" },
+  CAD: { name: "Dollar canadien",  flag: "https://flagcdn.com/w80/ca.png" },
+  JPY: { name: "Yen japonais",     flag: "https://flagcdn.com/w80/jp.png" },
+  TRY: { name: "Livre turque",     flag: "https://flagcdn.com/w80/tr.png" },
+  SAR: { name: "Riyal saoudien",   flag: "https://flagcdn.com/w80/sa.png" },
+  AED: { name: "Dirham EAU",       flag: "https://flagcdn.com/w80/ae.png" },
+  MAD: { name: "Dirham marocain",  flag: "https://flagcdn.com/w80/ma.png" t,
+  TND: { name: "Dinar tunisien",   flag: "https://flagcdn.com/w80/tn.png" },
+  CHF: { name: "Franc suisse",     flag: "https://flagcdn.com/w80/ch.png" },
+  CNY: { name: "Yuan chinois",     flag: "https://flagcdn.com/w80/cn.png" },
 };
 
-// Secours si une source est injoignable.
 const FALLBACK_SQUARE = {
   updated: "2026-06-15",
   rates: {
@@ -28,19 +38,22 @@ const FALLBACK_SQUARE = {
   },
   history: {},
 };
-const FALLBACK_OFFICIAL = { EUR: 154.07, USD: 133.2, GBP: 178.55, CAD: 95.22 };
+const FALLBACK_OFFICIAL = {
+  EUR: 154.07, USD: 133.2,  GBP: 178.55, CAD: 95.22,
+  JPY: 0.87,   TRY: 3.62,  SAR: 35.52,  AED: 36.28,
+  MAD: 13.11,  TND: 42.98, CHF: 149.5,  CNY: 18.32,
+};
 
-// ─────────────────────────────────────────────────────────────
+// âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 const fmt = (n, d = 2) =>
   n == null || isNaN(n)
-    ? "—"
+    ? "â"
     : n.toLocaleString("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d });
-// Écart vs taux officiel — même définition que les sources de référence.
 const spread = (buy, off) => (buy && off ? ((buy - off) / off) * 100 : 0);
 
-// ═════════════════════════════════════════════════════════════
-//  GapBar — la signature : distance officiel ↔ Square
-// ═════════════════════════════════════════════════════════════
+// âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+//  GapBar â la signature : distance officiel â Square
+// âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function GapBar({ official, square, big }) {
   if (!official || !square) return null;
   const RIGHT = 92;
@@ -62,18 +75,16 @@ function GapBar({ official, square, big }) {
   );
 }
 
-// MiniGap pour les cartes — barre dont le remplissage chaud = écart %
 function MiniGap({ pct }) {
   const w = Math.min(100, Math.max(2, pct));
   return (
     <div className="mini">
       <div className="mini-track"><span className="mini-fill" style={{ width: `${w}%` }} /></div>
-      <span className="mini-lbl">écart <b>{pct.toFixed(1)}%</b></span>
+      <span className="mini-lbl">Ã©cart <b>{pct.toFixed(1)}%</b></span>
     </div>
   );
 }
 
-// Double courbe officiel (froid) + Square (chaud)
 function TwoLineChart({ off, sq, w = 660, h = 150 }) {
   const all = [...off.map((p) => p.v), ...sq.map((p) => p.v)];
   if (all.length < 2) return <div style={{ height: h }} />;
@@ -103,21 +114,22 @@ function TwoLineChart({ off, sq, w = 660, h = 150 }) {
 function ChangeChip({ pct }) {
   if (pct == null || isNaN(pct)) return null;
   const up = pct >= 0;
-  return <span className={`chip ${up ? "up" : "down"}`}>{up ? "▲" : "▼"} {Math.abs(pct).toFixed(2)}%</span>;
+  return <span className={`chip ${up ? "up" : "down"}`}>{up ? "â²" : "â¼"} {Math.abs(pct).toFixed(2)}%</span>;
 }
 
-// ═════════════════════════════════════════════════════════════
-//  Convertisseur — sens réversible, montants rapides, copie
-// ═════════════════════════════════════════════════════════════
+// âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+//  Convertisseur
+// âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function Converter({ rows }) {
   const [amount, setAmount] = useState("100");
   const [code, setCode] = useState("EUR");
   const [mode, setMode] = useState("square");
-  const [dir, setDir] = useState("fwd"); // fwd: devise→DZD · inv: DZD→devise
+  const [dir, setDir] = useState("fwd");
   const [copied, setCopied] = useState(false);
-  const row = rows.find((r) => r.code === code) || rows[0];
+  const visibleRows = mode === "square" ? rows.filter((r) => r.hasSquare) : rows;
+  const row = visibleRows.find((r) => r.code === code) || visibleRows[0];
   if (!row) return null;
-  const rate = mode === "square" ? row.sell : row.official;
+  const rate = mode === "square" ? (row.sell ?? row.official) : row.official;
   const amt = parseFloat(amount || "0");
   const result = dir === "fwd" ? amt * (rate || 0) : (rate ? amt / rate : 0);
   const outUnit = dir === "fwd" ? "DZD" : code;
@@ -146,20 +158,20 @@ function Converter({ rows }) {
           onChange={(e) => setAmount(e.target.value)} aria-label="Montant" />
         {dir === "fwd" && (
           <select className="conv-select" value={code} onChange={(e) => setCode(e.target.value)} aria-label="Devise">
-            {rows.map((r) => <option key={r.code} value={r.code}>{r.code}</option>)}
+            {visibleRows.map((r) => <option key={r.code} value={r.code}>{r.code}</option>)}
           </select>
         )}
       </div>
 
-      <button className="conv-swap" onClick={() => setDir(dir === "fwd" ? "inv" : "fwd")} aria-label="Inverser le sens">⇅</button>
+      <button className="conv-swap" onClick={() => setDir(dir === "fwd" ? "inv" : "fwd")} aria-label="Inverser le sens">â</button>
 
       <div className="conv-out">
-        <button className="conv-copy" onClick={copy} title="Copier">{copied ? "✓" : "⧉"}</button>
+        <button className="conv-copy" onClick={copy} title="Copier">{copied ? "â" : "â§"}</button>
         <span className="conv-num num">{fmt(result)}</span>
         <span className="conv-unit">{outUnit}</span>
         {dir === "inv" && (
           <select className="conv-select conv-select-out" value={code} onChange={(e) => setCode(e.target.value)} aria-label="Devise">
-            {rows.map((r) => <option key={r.code} value={r.code}>{r.code}</option>)}
+            {visibleRows.map((r) => <option key={r.code} value={r.code}>{r.code}</option>)}
           </select>
         )}
       </div>
@@ -171,31 +183,33 @@ function Converter({ rows }) {
       </div>
 
       <div className="conv-note">
-        1 {code} = <b className="num">{fmt(rate)}</b> DZD · {mode === "square" ? "taux Square (vente)" : "taux officiel"}
+        1 {code} = <b className="num">{fmt(rate)}</b> DZD Â· {mode === "square" ? "taux Square (vente)" : "taux officiel"}
       </div>
     </div>
   );
 }
 
-// ═════════════════════════════════════════════════════════════
+// âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function RateCard({ r, active, onClick }) {
-  const sp = spread(r.buy, r.official);
+  const sp = r.hasSquare ? spread(r.buy, r.official) : 0;
   return (
-    <button className={`card ${active ? "card-active" : ""}`} onClick={onClick}>
+    <button className={`card ${active ? "card-active" : ""} ${!r.hasSquare ? "card-offonly" : ""}`} onClick={onClick}>
       <div className="card-top">
         <img src={r.flag} alt="" className="flag" />
         <div className="card-id">
           <span className="card-code">{r.code}</span>
           <span className="card-name">{r.name}</span>
         </div>
-        <ChangeChip pct={r.change?.square} />
+        {r.hasSquare ? <ChangeChip pct={r.change?.square} /> : <span className="off-badge">Officiel</span>}
       </div>
-      <MiniGap pct={sp} />
-      <div className="card-rates">
-        <div><span className="lbl st-lbl">Achat</span><span className="val num">{fmt(r.buy)}</span></div>
-        <div><span className="lbl st-lbl">Vente</span><span className="val num">{fmt(r.sell)}</span></div>
-        <div><span className="lbl off-lbl">Officiel</span><span className="val num val-off">{fmt(r.official)}</span></div>
-      </div>
+      {r.hasSquare ? <MiniGap pct={sp} /> : <div className="off-only-row"><span className="off-lbl">Officiel</span><span className="val num val-off">{fmt(r.official)}</span><span className="off-lbl-dzd">DZD</span></div>}
+      {r.hasSquare && (
+        <div className="card-rates">
+          <div><span className="lbl st-lbl">Achat</span><span className="val num">{fmt(r.buy)}</span></div>
+          <div><span className="lbl st-lbl">Vente</span><span className="val num">{fmt(r.sell)}</span></div>
+          <div><span className="lbl off-lbl">Officiel</span><span className="val num val-off">{fmt(r.official)}</span></div>
+        </div>
+      )}
     </button>
   );
 }
@@ -212,9 +226,9 @@ function Stat({ label, value, hint }) {
 
 function Detail({ r }) {
   if (!r) return null;
-  const sp = spread(r.buy, r.official);
+  const sp = r.hasSquare ? spread(r.buy, r.official) : 0;
   const offSeries = r.offHist?.length > 1 ? r.offHist : [];
-  const sqSeries = r.sqHist?.length > 1 ? r.sqHist : [];
+  const sqSeries = r.hasSquare && r.sqHist?.length > 1 ? r.sqHist : [];
   const offV = offSeries.map((p) => p.v);
   const sqV = sqSeries.map((p) => p.v);
   const stat = (arr) => arr.length ? {
@@ -228,20 +242,20 @@ function Detail({ r }) {
         <img src={r.flag} alt="" className="flag flag-lg" />
         <div className="detail-title">
           <h3>{r.code}<span className="slash">/</span>DZD</h3>
-          <span className="detail-sub">{r.name} · marché parallèle vs officiel</span>
+          <span className="detail-sub">{r.name} Â· {r.hasSquare ? "marchÃ© parallÃ¨le vs officiel" : "taux officiel uniquement"}</span>
         </div>
         <div className="detail-now">
-          <span className="detail-now-num num">{fmt(r.buy)}</span>
-          <span className="detail-now-tag">écart +{sp.toFixed(2)}%</span>
+          <span className="detail-now-num num">{r.hasSquare ? fmt(r.buy) : fmt(r.official)}</span>
+          <span className="detail-now-tag">{r.hasSquare ? `Ã©cart +${sp.toFixed(2)}%` : "Frankfurter"}</span>
         </div>
       </div>
 
-      <GapBar official={r.official} square={r.buy} big />
+      {r.hasSquare && <GapBar official={r.official} square={r.buy} big />}
 
       <div className="detail-chart-wrap">
         <div className="chart-legend">
-          <span><i className="sw off" /> Officiel <small>(temps réel)</small></span>
-          <span><i className="sw st" /> Square <small>(saisi)</small></span>
+          <span><i className="sw off" /> Officiel <small>(temps rÃ©el)</small></span>
+          {r.hasSquare && <span><i className="sw st" /> Square <small>(saisi)</small></span>}
         </div>
         <div className="detail-chart">
           y(offSeries.length > 1 || sqSeries.length > 1)
@@ -252,20 +266,20 @@ function Detail({ r }) {
       </div>
 
       <div className="detail-grid">
-        <Stat label="Achat Square" value={`${fmt(r.buy)}`} hint="DZD" />
-        <Stat label="Vente Square" value={`${fmt(r.sell)}`} hint="DZD" />
-        <Stat label="Officiel" value={`${fmt(r.official)}`} hint="DZD · réf. banques centrales" />
-        <Stat label="Écart vs officiel" value={`+${sp.toFixed(2)}%`} hint="prime du marché parallèle" />
-        {ss && <Stat label="Square min / max" value={`${fmt(ss.min)} – ${fmt(ss.max)}`} hint="sur la période" />}
-        {so && <Stat label="Officiel min / max" value={`${fmt(so.min)} – ${fmt(so.max)}`} hint="sur la période" />}
+        {r.hasSquare && <Stat label="Achat Square" value={`${fmt(r.buy)}`} hint="DZD" />}
+        {r.hasSquare && <Stat label="Vente Square" value={`${fmt(r.sell)}`} hint="DZD" />}
+        <Stat label="Officiel" value={`${fmt(r.official)}`} hint="DZD Â· rÃ©f. banques centrales" />
+        {r.hasSquare && <Stat label="Ãcart vs officiel" value={`+${sp.toFixed(2)}%`} hint="prime du marchÃ© parallÃ¨le" />}
+        {ss && <Stat label="Square min / max" value={`${fmt(ss.min)} â ${fmt(ss.max)}`} hint="sur la pÃ©riode" />}
+        {so && <Stat label="Officiel min / max" value={`${fmt(so.min)} â ${fmt(so.max)}`} hint="sur la pÃ©riode" />}
       </div>
     </div>
   );
 }
 
-// ═════════════════════════════════════════════════════════════
+// âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 //  App
-// ═════════════════════════════════════════════════════════════
+// âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 export default function App() {
   const [official, setOfficial] = useState(null);
   const [offHist, setOffHist] = useState({});
@@ -281,12 +295,12 @@ export default function App() {
     setWarn("");
     let offOk = false, sqOk = false;
 
-    // Taux officiels + historique (Frankfurter v2)
+    // Taux officiels + historique (Frankfurter v2 â ECB currencies only)
     try {
       const today = new Date();
       const from = new Date(Date.now() - 44 * 864e5);
       const iso = (d) => d.toISOString().slice(0, 10);
-      const q = CODES.filter((c) => c !== "EUR").join(",") + ",DZD";
+      const q = FKFR_CODES.join(",") + ",DZD";
       const [latR, serR] = await Promise.all([
         fetch(`${OFFICIAL_API}/rates?base=EUR&quotes=${q}`),
         fetch(`${OFFICIAL_API}/rates?base=EUR&quotes=${q}&from=${iso(from)}&to=${iso(today)}`),
@@ -295,8 +309,9 @@ export default function App() {
       const lat = await latR.json();
       const ser = await serR.json();
       const eurDzd = lat.rates.DZD;
-      const off = { EUR: eurDzd };
-      for (const c of CODES) if (c !== "EUR" && lat.rates[c]) off[c] = eurDzd / lat.rates[c];
+      // Start from fallback, override with live data
+      const off = { ...FALLBACK_OFFICIAL, EUR: eurDzd };
+      for (const c of FKFR_CODES) if (lat.rates[c]) off[c] = eurDzd / lat.rates[c];
 
       const hist = {}; CODES.forEach((c) => (hist[c] = []));
       const dates = Object.keys(ser.rates || {}).sort();
@@ -305,7 +320,7 @@ export default function App() {
         const dz = rowD?.DZD;
         if (!dz) continue;
         hist.EUR.push({ d, v: dz });
-        for (const c of CODES) if (c !== "EUR" && rowD[c]) hist[c].push({ d, v: dz / rowD[c] });
+        for (const c of FKFR_CODES) if (rowD[c]) hist[c].push({ d, v: dz / rowD[c] });
       }
       setOfficial(off); setOffHist(hist); offOk = true;
     } catch {
@@ -321,7 +336,7 @@ export default function App() {
       setSquare(data); sqOk = true;
     } catch {
       setSquare(FALLBACK_SQUARE);
-      setWarn("Taux Square : source distante injoignable — valeurs de secours affichées.");
+      setWarn("Taux Square : source distante injoignable â valeurs de secours affichÃ©es.");
     }
 
     setFetchedAt(new Date().toLocaleString("fr-FR", { hour: "2-digit", minute: "2-digit" }));
@@ -338,31 +353,34 @@ export default function App() {
   const rows = useMemo(() => {
     if (!square || !official) return [];
     return CODES.map((c) => {
-      const sq = square.rates[c] || {};
-      const off = official[c] ?? null;
+      const hasSquare = SQUARE_CODES.includes(c);
+      const sq = hasSquare ? (square.rates[c] || {}) : {};
+      const off = official[c] ?? FALLBACK_OFFICIAL[c] ?? null;
       const oH = offHist[c] || [];
-      const sH = (square.history?.[c] || []).map((p) => ({ d: p.d, v: p.buy }));
+      const sH = hasSquare ? (square.history?.[c] || []).map((p) => ({ d: p.d, v: p.buy })) : [];
       const chg = (arr) => arr.length >= 2 ? ((arr[arr.length - 1].v - arr[arr.length - 2].v) / arr[arr.length - 2].v) * 100 : null;
       return {
         code: c, name: META[c].name, flag: META[c].flag,
-        buy: sq.buy ?? null, sell: sq.sell ?? null, official: off,
-        offHist: oH, sqHist: sH,
-        change: { official: chg(oH), square: chg(sH) },
+        buy: hasSquare ? (sq.buy ?? null) : null,
+        sell: hasSquare ? (sq.sell ?? null) : null,
+        official: off, offHist: oH, sqHist: sH, hasSquare,
+        change: { official: chg(oH), square: hasSquare ? chg(sH) : null },
       };
     });
   }, [square, official, offHist]);
 
+  const squareRows = rows.filter((r) => r.hasSquare);
   const active = rows.find((r) => r.code === activeCode);
   const stats = useMemo(() => {
-    if (!rows.length) return null;
-    const sp = rows.map((r) => spread(r.buy, r.official));
+    if (!squareRows.length) return null;
+    const sp = squareRows.map((r) => spread(r.buy, r.official));
     const maxI = sp.indexOf(Math.max(...sp));
     return {
       avg: sp.reduce((a, b) => a + b, 0) / sp.length,
-      max: Math.max(...sp), maxCode: rows[maxI].code,
+      max: Math.max(...sp), maxCode: squareRows[maxI]?.code,
       count: rows.length, updated: square?.updated,
     };
-  }, [rows, square]);
+  }, [rows, squareRows, square]);
 
   return (
     <div className="root">
@@ -370,46 +388,46 @@ export default function App() {
 
       <div className="ticker">
         <div className="ticker-track">
-          {rows.length
-            ? [...rows, ...rows].map((r, i) => (
+          {squareRows.length
+            ? [...squareRows, ...squareRows].map((r, i) => (
                 <span className="ticker-item" key={i}>
                   <img src={r.flag} alt="" /> {r.code} <b className="num">{fmt(r.buy)}</b>
                   <span className="ti-off num">off {fmt(r.official, 0)}</span>
                   <em className="ti-gap">+{spread(r.buy, r.official).toFixed(0)}%</em>
                 </span>
               ))
-            : <span className="ticker-item">Chargement des taux…</span>}
+            : <span className="ticker-item">Chargement des tauxâ¦</span>}
         </div>
       </div>
 
       <header className="head">
         <div className="brand">
-          <div className="logo"><span>د</span></div>
+          <div className="logo"><span>Ø¯</span></div>
           <div>
             <span className="brand-name">DinarTaux</span>
-            <span className="brand-sub">Square &amp; taux officiel · Algérie</span>
+            <span className="brand-sub">Square &amp; taux officiel Â· AlgÃ©rie</span>
           </div>
         </div>
         <div className="head-meta">
           <span className={`live ${status === "loading" ? "load" : status === "error" ? "err" : ""}`}>
-            <i /> {status === "loading" ? "Mise à jour…" : status === "error" ? "Hors ligne" : "En direct"}
+            <i /> {status === "loading" ? "Mise Ã  jourâ¦" : status === "error" ? "Hors ligne" : "En direct"}
           </span>
           <span className="clock">
-            {fetchedAt ? `Actualisé ${fetchedAt}` : "—"}
-            <button className="refresh" onClick={load} title="Rafraîchir">↻</button>
+            {fetchedAt ? `ActualisÃ© ${fetchedAt}` : "â"}
+            <button className="refresh" onClick={load} title="RafraÃ®chir">â»</button>
           </span>
         </div>
       </header>
 
       <section className="hero">
         <div className="hero-left">
-          <span className="eyebrow">Marché du dinar · Square vs officiel</span>
+          <span className="eyebrow">MarchÃ© du dinar Â· Square vs officiel</span>
           <h1>Le vrai prix<br />du <span>dinar</span></h1>
           <p>
-            L'écart entre le cours <b className="t-off">officiel</b> et le taux <b className="t-st">Square</b>
-            {" "}du marché parallèle, en un coup d'œil. Officiel en temps réel, Square saisi et vérifié.
+            L'Ã©cart entre le cours <b className="t-off">officiel</b> et le taux <b className="t-st">Square</b>
+            {" "}du marchÃ© parallÃ¨le, en un coup d'Åil. Officiel en temps rÃ©el, Square saisi et vÃ©rifiÃ©.
           </p>
-          {active && (
+          {active && active.hasSquare && (
             <div className="hero-gap-card">
               <div className="hgc-head">
                 <img src={active.flag} alt="" className="flag" />
@@ -421,10 +439,10 @@ export default function App() {
           )}
           {stats && (
             <div className="hero-stats">
-              <Stat label="Écart moyen" value={`${stats.avg.toFixed(1)}%`} />
-              <Stat label="Plus grand écart" value={`${stats.max.toFixed(0)}%`} hint={stats.maxCode} />
+              <Stat label="Ãcart moyen" value={`${stats.avg.toFixed(1)}%`} />
+              <Stat label="Plus grand Ã©cart" value={`${stats.max.toFixed(0)}%`} hint={stats.maxCode} />
               <Stat label="Devises" value={stats.count} />
-              <Stat label="Maj Square" value={stats.updated?.slice(5) || "—"} hint={stats.updated?.slice(0, 4)} />
+              <Stat label="Maj Square" value={stats.updated?.slice(5) || "â"} hint={stats.updated?.slice(0, 4)} />
             </div>
           )}
         </div>
@@ -433,12 +451,12 @@ export default function App() {
 
       {square && (
         <div className={`srcbar ${warn ? "warn" : ""}`}>
-          {warn ? <>⚠ {warn}</> : <>✓ Square saisi le <b>{square.updated}</b> · officiel en temps réel (Frankfurter) · l'historique se construit chaque jour</>}
+          {warn ? <>â  {warn}</> : <>â Square saisi le <b>{square.updated}</b> Â· officiel en temps rÃ©el (Frankfurter) Â· l'historique se construit chaque jour</>}
         </div>
       )}
 
       <section className="section">
-        <div className="section-head"><h2>Taux indicatifs</h2><span className="muted">Cliquez pour les détails</span></div>
+        <div className="section-head"><h2>Taux indicatifs</h2><span className="muted">Cliquez pour les dÃ©tails</span></div>
         <div className="cards">
           {rows.length
             ? rows.map((r) => <RateCard key={r.code} r={r} active={r.code === activeCode} onClick={() => setActiveCode(r.code)} />)
@@ -453,7 +471,7 @@ export default function App() {
         <div className="table-wrap">
           <table className="tbl">
             <thead>
-              <tr><th>Devise</th><th className="th-st">Achat</th><th className="th-st">Vente</th><th className="th-off">Officiel</th><th>Écart</th><th>24h</th></tr>
+              <tr><th>Devise</th><th className="th-st">Achat</th><th className="th-st">Vente</th><th className="th-off">Officiel</th><th>Ãcart</th><th>24h</th></tr>
             </thead>
             <tbody>
               {rows.map((r) => (
@@ -462,11 +480,11 @@ export default function App() {
                     <div className="td-cur"><img src={r.flag} alt="" className="flag" />
                       <span><b>{r.code}</b><small>{r.name}</small></span></div>
                   </td>
-                  <td className="num"><b>{fmt(r.buy)}</b></td>
-                  <td className="num">{fmt(r.sell)}</td>
+                  <td className="num">{r.hasSquare ? <b>{fmt(r.buy)}</b> : <span className="val-off">â</span>}</td>
+                  <td className="num">{r.hasSquare ? fmt(r.sell) : <span className="val-off">â</span>}</td>
                   <td className="num val-off">{fmt(r.official)}</td>
-                  <td><span className="spread">+{spread(r.buy, r.official).toFixed(1)}%</span></td>
-                  <td><ChangeChip pct={r.change?.square} /></td>
+                  <td>{r.hasSquare ? <span className="spread">+{spread(r.buy, r.official).toFixed(1)}%</span> : <span className="muted-dash">â</span>}</td>
+                  <td>{r.hasSquare ? <ChangeChip pct={r.change?.square} /> : <ChangeChip pct={r.change?.official} />}</td>
                 </tr>
               ))}
             </tbody>
@@ -475,17 +493,17 @@ export default function App() {
       </section>
 
       <section className="notice">
-        <span className="notice-icon">⚠</span>
+        <span className="notice-icon">â </span>
         <p>
-          Taux <b>indicatifs</b>, pas une offre de change. L'« officiel » est une référence de marché
-          (banques centrales) très proche du cours de la Banque d'Algérie sans en être strictement identique.
-          Le « Square » reflète le marché parallèle et est saisi manuellement. Vérifiez avant toute opération.
+          Taux <b>indicatifs</b>, pas une offre de change. L'Â« officiel Â» est une rÃ©fÃ©rence de marchÃ©
+          (banques centrales) trÃ¨s proche du cours de la Banque d'AlgÃ©rie sans en Ãªtre strictement identique.
+          Le Â« Square Â» reflÃ¨te le marchÃ© parallÃ¨le et est saisi manuellement. VÃ©rifiez avant toute opÃ©ration.
         </p>
       </section>
 
       <footer className="foot">
-        <span>© 2026 DinarTaux · Intelligence économique Algérie</span>
-        <span className="foot-upd">Officiel : Frankfurter · Square : saisie vérifiée</span>
+        <span>Â© 2026 DinarTaux Â· Intelligence Ã©conomique AlgÃ©rie</span>
+        <span className="foot-upd">Officiel : Frankfurter Â· Square : saisie vÃ©rifiÃ©e</span>
       </footer>
     </div>
   );
@@ -498,8 +516,8 @@ const CSS = `
 .root{
   --bg:#090C15;--bg2:#0E121D;--surface:#141926;--surface2:#1A2030;--line:#252D40;
   --text:#EEF1F8;--dim:#929DB4;--mute:#5A6479;
-  --off:#6AA0FF;--off-deep:#3D6FD6;        /* officiel = froid */
-  --st:#F7B23B;--st-deep:#E0951F;           /* Square = chaud */
+  --off:#6AA0FF;--off-deep:#3D6FD6;
+  --st:#F7B23B;--st-deep:#E0951F;
   --up:#46E0A0;--down:#FB6F88;
   --mono:'Geist Mono','SF Mono',ui-monospace,monospace;
   background:
@@ -514,6 +532,7 @@ const CSS = `
 .num{font-family:var(--mono);font-variant-numeric:tabular-nums;font-feature-settings:'tnum' 1}
 .t-off{color:var(--off)}.t-st{color:var(--st)}
 .val-off{color:var(--off)!important}
+.muted-dash{color:var(--mute)}
 button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--off);outline-offset:2px}
 
 /* Ticker */
@@ -521,7 +540,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .ticker-track{display:inline-flex;gap:34px;padding:9px 0;white-space:nowrap;animation:slide 36s linear infinite}
 @keyframes slide{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 .ticker-item{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--dim)}
-.ticker-item img{width:18px;height:13px;border-radius:2px;object-fit:cover}
+.ticker-item img{width:18px;height:13px;border-radius:2xh;object-fit:cover}
 .ticker-item b{color:var(--text)}
 .ti-off{color:var(--off);font-size:11px}
 .ti-gap{font-style:normal;color:var(--st);font-weight:600;font-size:12px}
@@ -576,7 +595,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .sw.off{background:var(--off)}.sw.st{background:var(--st)}
 
 /* Mini gap (cards) */
-.mini{margin:4px 0 13px}
+.mini{margin:4px 0 13py}
 .mini-track{height:6px;border-radius:4px;background:var(--bg2);border:1px solid var(--line);overflow:hidden}
 .mini-fill{display:block;height:100%;background:linear-gradient(90deg,var(--st-deep),var(--st))}
 .mini-lbl{display:block;font-size:11px;color:var(--dim);margin-top:6px}
@@ -637,6 +656,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .card{text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:17px;padding:17px;cursor:pointer;transition:.18s;font-family:inherit;color:inherit}
 .card:hover{border-color:var(--off);transform:translateY(-3px)}
 .card-active{border-color:var(--st);background:var(--surface2);box-shadow:0 0 0 1px var(--st),0 20px 44px -24px rgba(247,178,59,.5)}
+.card-offonly{opacity:.88}
 .card.skeleton{height:172px;animation:sk 1.4s ease-in-out infinite;cursor:default;border-style:dashed}
 @keyframes sk{0%,100%{opacity:.45}50%{opacity:.8}}
 .card-top{display:flex;align-items:center;gap:9px;margin-bottom:13px}
@@ -649,6 +669,9 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .lbl{display:block;font-size:10px;margin-bottom:3px}
 .st-lbl{color:var(--st)}.off-lbl{color:var(--off)}
 .val{font-size:14px;font-weight:600}
+.off-badge{font-size:10px;font-weight:600;color:var(--off);background:rgba(106,160,255,.12);border:1px solid rgba(106,160,255,.25);padding:2px 8px;border-radius:20px}
+.off-only-row{display:flex;align-items:baseline;gap:6px;padding:12px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin:8px 0}
+.off-lbl-dzd{font-size:10px;color:var(--mute)}
 
 /* Detail */
 .detail{background:linear-gradient(160deg,var(--surface2),var(--surface));border:1px solid var(--line);border-radius:22px;padding:26px}
