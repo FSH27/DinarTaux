@@ -24,7 +24,7 @@ const META = {
   TRY: { name: "Livre turque",     flag: "https://flagcdn.com/w80/tr.png" },
   SAR: { name: "Riyal saoudien",   flag: "https://flagcdn.com/w80/sa.png" },
   AED: { name: "Dirham EAU",       flag: "https://flagcdn.com/w80/ae.png" },
-  MAD: { name: "Dirham marocain",  flag: "https://flagcdn.com/w80/ma.png" t,
+  MAD: { name: "Dirham marocain",  flag: "https://flagcdn.com/w80/ma.png" },
   TND: { name: "Dinar tunisien",   flag: "https://flagcdn.com/w80/tn.png" },
   CHF: { name: "Franc suisse",     flag: "https://flagcdn.com/w80/ch.png" },
   CNY: { name: "Yuan chinois",     flag: "https://flagcdn.com/w80/cn.png" },
