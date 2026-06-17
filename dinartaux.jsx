@@ -306,18 +306,24 @@ export default function App() {
         fetch(`${OFFICIAL_API}/rates?base=EUR&quotes=${q}&from=${iso(from)}&to=${iso(today)}`),
       ]);
       if (!latR.ok || !serR.ok) throw new Error("frankfurter");
-      const lat = await latR.json();
-      const ser = await serR.json();
-      const eurDzd = lat.rates.DZD;
+      // Frankfurter v2 returns a flat array of { date, base, quote, rate } rows,
+      // not the nested { rates: {...} } shape — flatten into lookup maps.
+      const latRows = await latR.json();
+      const serRows = await serR.json();
+      const latMap = {};
+      for (const row of latRows) latMap[row.quote] = row.rate;
+      const eurDzd = latMap.DZD;
       // Start from fallback, override with live data
       const off = { ...FALLBACK_OFFICIAL, EUR: eurDzd };
-      for (const c of FKFR_CODES) if (lat.rates[c]) off[c] = eurDzd / lat.rates[c];
+      for (const c of FKFR_CODES) if (latMap[c]) off[c] = eurDzd / latMap[c];
 
+      const byDate = {};
+      for (const row of serRows) (byDate[row.date] ??= {})[row.quote] = row.rate;
       const hist = {}; CODES.forEach((c) => (hist[c] = []));
-      const dates = Object.keys(ser.rates || {}).sort();
+      const dates = Object.keys(byDate).sort();
       for (const d of dates) {
-        const rowD = ser.rates[d];
-        const dz = rowD?.DZD;
+        const rowD = byDate[d];
+        const dz = rowD.DZD;
         if (!dz) continue;
         hist.EUR.push({ d, v: dz });
         for (const c of FKFR_CODES) if (rowD[c]) hist[c].push({ d, v: dz / rowD[c] });
@@ -388,12 +394,19 @@ export default function App() {
 
       <div className="ticker">
         <div className="ticker-track">
-          {squareRows.length
-            ? [...squareRows, ...squareRows].map((r, i) => (
+          {rows.length
+            ? [...rows, ...rows].map((r, i) => (
                 <span className="ticker-item" key={i}>
-                  <img src={r.flag} alt="" /> {r.code} <b className="num">{fmt(r.buy)}</b>
-                  <span className="ti-off num">off {fmt(r.official, 0)}</span>
-                  <em className="ti-gap">+{spread(r.buy, r.official).toFixed(0)}%</em>
+                  <img src={r.flag} alt="" /> {r.code}{" "}
+                  {r.hasSquare ? (
+                    <>
+                      <b className="num">{fmt(r.buy)}</b>
+                      <span className="ti-off num">off {fmt(r.official, 0)}</span>
+                      <em className="ti-gap">+{spread(r.buy, r.official).toFixed(0)}%</em>
+                    </>
+                  ) : (
+                    <b className="num">{fmt(r.official, 2)}</b>
+                  )}
                 </span>
               ))
             : <span className="ticker-item">Chargement des taux…</span>}
