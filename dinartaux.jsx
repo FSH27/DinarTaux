@@ -53,16 +53,130 @@ const FALLBACK_OFFICIAL = {
 };
 
 // ─────────────────────────────────────────────────────────────
+// i18n — noms de devises / métaux par langue
+const META_NAMES = {
+  fr: { EUR: "Euro", USD: "Dollar US", GBP: "Livre Sterling", CAD: "Dollar canadien", JPY: "Yen japonais", TRY: "Livre turque", SAR: "Riyal saoudien", AED: "Dirham EAU", MAD: "Dirham marocain", TND: "Dinar tunisien", CHF: "Franc suisse", CNY: "Yuan chinois" },
+  en: { EUR: "Euro", USD: "US Dollar", GBP: "British Pound", CAD: "Canadian Dollar", JPY: "Japanese Yen", TRY: "Turkish Lira", SAR: "Saudi Riyal", AED: "UAE Dirham", MAD: "Moroccan Dirham", TND: "Tunisian Dinar", CHF: "Swiss Franc", CNY: "Chinese Yuan" },
+  ar: { EUR: "يورو", USD: "دولار أمريكي", GBP: "جنيه إسترليني", CAD: "دولار كندي", JPY: "ين ياباني", TRY: "ليرة تركية", SAR: "ريال سعودي", AED: "درهم إماراتي", MAD: "درهم مغربي", TND: "دينار تونسي", CHF: "فرنك سويسري", CNY: "يوان صيني" },
+};
+const METALS_NAMES = {
+  fr: { XAU: "Or", XAG: "Argent" },
+  en: { XAU: "Gold", XAG: "Silver" },
+  ar: { XAU: "ذهب", XAG: "فضة" },
+};
+
+const LOCALE_MAP = { fr: "fr-FR", en: "en-US", ar: "ar-DZ-u-nu-latn" };
+let CURRENT_LOCALE = "fr-FR";
+
+const STRINGS = {
+  fr: {
+    tickerLoading: "Chargement des taux…",
+    brandSub: "Square & taux officiel · Algérie",
+    liveUpdating: "Mise à jour…", liveOffline: "Hors ligne", liveOnline: "En direct",
+    refreshedPrefix: "Actualisé", refreshTitle: "Rafraîchir",
+    themeToLight: "Passer en mode clair", themeToDark: "Passer en mode sombre", themeAria: "Changer de thème",
+    langAria: "Changer de langue",
+    eyebrow: "Marché du dinar · Square vs officiel",
+    heroTitle1: "Le vrai prix", heroTitle2Pre: "du ", heroTitle2Word: "dinar",
+    heroP1: "L'écart entre le cours ", heroPOff: "officiel", heroP2: " et le taux ", heroPSt: "Square",
+    heroP3: " du marché parallèle, en un coup d'œil. Officiel en temps réel, Square saisi et vérifié.",
+    statAvgGap: "Écart moyen", statMaxGap: "Plus grand écart", statCurrencies: "Devises", statSquareUpdate: "Maj Square",
+    sectionRatesTitle: "Taux indicatifs", sectionRatesSub: "Cliquez pour les détails",
+    sectionMetalsTitle: "Métaux précieux", sectionMetalsSub: "Or & argent · spot temps réel",
+    sectionTableTitle: "Tableau comparatif", sectionTableSub: "Square vs officiel",
+    thCurrency: "Devise", thBuy: "Achat", thSell: "Vente", thOfficial: "Officiel", thGap: "Écart", th24h: "24h",
+    noticePre: "Taux ", noticeB: "indicatifs", noticePost: ", pas une offre de change. L'« officiel » est une référence de marché (banques centrales) très proche du cours de la Banque d'Algérie sans en être strictement identique. Le « Square » reflète le marché parallèle et est saisi manuellement. Vérifiez avant toute opération.",
+    footerCopy: "© 2026 DinarTaux · Intelligence économique Algérie",
+    footerUpd: "Officiel : Frankfurter · Square : saisie vérifiée",
+    srcbarOkPre: "Square saisi le", srcbarOkPost: " · officiel en temps réel (Frankfurter) · l'historique se construit chaque jour",
+    srcbarWarn: "Taux Square : source distante injoignable — valeurs de secours affichées.",
+    convTitle: "Convertisseur", convOfficial: "Officiel", amountAria: "Montant", currencyAria: "Devise",
+    swapAria: "Inverser le sens", copyTitle: "Copier",
+    convNoteSquare: "taux Square (vente)", convNoteOfficial: "taux officiel",
+    perGram: "DZD / gramme", perOz: "DZD / once", usdPerOz: "USD / once", troyOz: "once troy",
+    detailParallel: "marché parallèle vs officiel", detailOfficialOnly: "taux officiel uniquement",
+    gapWord: "écart", chartOfficial: "Officiel", chartRealtime: "(temps réel)", chartEntered: "(saisi)",
+    chartEmpty: "Historique en cours de constitution.", chartXAgo: "il y a ~6 sem.", chartXToday: "aujourd'hui",
+    statBuySquare: "Achat Square", statSellSquare: "Vente Square", statOfficialHint: "DZD · réf. banques centrales",
+    statGapVsOfficial: "Écart vs officiel", statGapHint: "prime du marché parallèle",
+    statSquareMinMax: "Square min / max", statOfficialMinMax: "Officiel min / max", periodHint: "sur la période",
+  },
+  en: {
+    tickerLoading: "Loading rates…",
+    brandSub: "Square & official rate · Algeria",
+    liveUpdating: "Updating…", liveOffline: "Offline", liveOnline: "Live",
+    refreshedPrefix: "Updated", refreshTitle: "Refresh",
+    themeToLight: "Switch to light mode", themeToDark: "Switch to dark mode", themeAria: "Change theme",
+    langAria: "Change language",
+    eyebrow: "Dinar market · Square vs official",
+    heroTitle1: "The real price", heroTitle2Pre: "of the ", heroTitle2Word: "dinar",
+    heroP1: "The gap between the ", heroPOff: "official", heroP2: " rate and the ", heroPSt: "Square",
+    heroP3: " parallel-market rate, at a glance. Official in real time, Square entered and verified.",
+    statAvgGap: "Average gap", statMaxGap: "Largest gap", statCurrencies: "Currencies", statSquareUpdate: "Square update",
+    sectionRatesTitle: "Indicative rates", sectionRatesSub: "Click for details",
+    sectionMetalsTitle: "Precious metals", sectionMetalsSub: "Gold & silver · real-time spot",
+    sectionTableTitle: "Comparison table", sectionTableSub: "Square vs official",
+    thCurrency: "Currency", thBuy: "Buy", thSell: "Sell", thOfficial: "Official", thGap: "Gap", th24h: "24h",
+    noticePre: "Rates are ", noticeB: "indicative", noticePost: " only, not an exchange offer. The “official” rate is a market reference (central banks) very close to the Bank of Algeria's rate without being strictly identical. The “Square” rate reflects the parallel market and is entered manually. Verify before any transaction.",
+    footerCopy: "© 2026 DinarTaux · Algeria economic intelligence",
+    footerUpd: "Official: Frankfurter · Square: verified entry",
+    srcbarOkPre: "Square entered on", srcbarOkPost: " · official in real time (Frankfurter) · history builds up daily",
+    srcbarWarn: "Square rate: remote source unreachable — fallback values shown.",
+    convTitle: "Converter", convOfficial: "Official", amountAria: "Amount", currencyAria: "Currency",
+    swapAria: "Swap direction", copyTitle: "Copy",
+    convNoteSquare: "Square rate (sell)", convNoteOfficial: "official rate",
+    perGram: "DZD / gram", perOz: "DZD / oz", usdPerOz: "USD / oz", troyOz: "troy ounce",
+    detailParallel: "parallel market vs official", detailOfficialOnly: "official rate only",
+    gapWord: "gap", chartOfficial: "Official", chartRealtime: "(real-time)", chartEntered: "(entered)",
+    chartEmpty: "History is being built.", chartXAgo: "~6 weeks ago", chartXToday: "today",
+    statBuySquare: "Square buy", statSellSquare: "Square sell", statOfficialHint: "DZD · central bank ref.",
+    statGapVsOfficial: "Gap vs official", statGapHint: "parallel market premium",
+    statSquareMinMax: "Square min / max", statOfficialMinMax: "Official min / max", periodHint: "over the period",
+  },
+  ar: {
+    tickerLoading: "جارٍ تحميل الأسعار…",
+    brandSub: "السوق الموازي والسعر الرسمي · الجزائر",
+    liveUpdating: "جارٍ التحديث…", liveOffline: "غير متصل", liveOnline: "مباشر",
+    refreshedPrefix: "آخر تحديث", refreshTitle: "تحديث",
+    themeToLight: "التبديل إلى الوضع الفاتح", themeToDark: "التبديل إلى الوضع الداكن", themeAria: "تغيير المظهر",
+    langAria: "تغيير اللغة",
+    eyebrow: "سوق الدينار · السوق الموازي مقابل الرسمي",
+    heroTitle1: "السعر الحقيقي", heroTitle2Pre: "لل", heroTitle2Word: "دينار",
+    heroP1: "الفرق بين السعر ", heroPOff: "الرسمي", heroP2: " وسعر ", heroPSt: "السوق الموازي",
+    heroP3: " في لمحة واحدة. الرسمي في الوقت الفعلي، والموازي مُدخل ومُتحقق منه.",
+    statAvgGap: "الفرق المتوسط", statMaxGap: "أكبر فرق", statCurrencies: "العملات", statSquareUpdate: "تحديث الموازي",
+    sectionRatesTitle: "أسعار إرشادية", sectionRatesSub: "اضغط للتفاصيل",
+    sectionMetalsTitle: "المعادن الثمينة", sectionMetalsSub: "الذهب والفضة · السعر الفوري",
+    sectionTableTitle: "جدول المقارنة", sectionTableSub: "السوق الموازي مقابل الرسمي",
+    thCurrency: "العملة", thBuy: "شراء", thSell: "بيع", thOfficial: "رسمي", thGap: "الفرق", th24h: "24 س",
+    noticePre: "الأسعار ", noticeB: "إرشادية", noticePost: " فقط، وليست عرض صرف. السعر «الرسمي» هو مرجع سوقي (بنوك مركزية) قريب جدًا من سعر بنك الجزائر دون أن يكون مطابقًا له تمامًا. ويعكس سعر «السوق الموازي» السوق الموازي ويتم إدخاله يدويًا. تحقق قبل أي عملية.",
+    footerCopy: "© 2026 DinarTaux · معلومات اقتصادية الجزائر",
+    footerUpd: "الرسمي: Frankfurter · الموازي: بيانات موثقة",
+    srcbarOkPre: "تم إدخال السوق الموازي في", srcbarOkPost: " · الرسمي في الوقت الفعلي (Frankfurter) · يتم بناء السجل يوميًا",
+    srcbarWarn: "سعر السوق الموازي: تعذر الوصول إلى المصدر — يتم عرض قيم احتياطية.",
+    convTitle: "محول العملات", convOfficial: "رسمي", amountAria: "المبلغ", currencyAria: "العملة",
+    swapAria: "عكس الاتجاه", copyTitle: "نسخ",
+    convNoteSquare: "سعر السوق الموازي (بيع)", convNoteOfficial: "السعر الرسمي",
+    perGram: "دينار / غرام", perOz: "دينار / أونصة", usdPerOz: "دولار / أونصة", troyOz: "أونصة تروي",
+    detailParallel: "السوق الموازي مقابل الرسمي", detailOfficialOnly: "السعر الرسمي فقط",
+    gapWord: "فرق", chartOfficial: "رسمي", chartRealtime: "(فوري)", chartEntered: "(مُدخل)",
+    chartEmpty: "السجل قيد الإنشاء.", chartXAgo: "منذ ~6 أسابيع", chartXToday: "اليوم",
+    statBuySquare: "شراء السوق الموازي", statSellSquare: "بيع السوق الموازي", statOfficialHint: "دينار · مرجع البنوك المركزية",
+    statGapVsOfficial: "الفرق عن الرسمي", statGapHint: "علاوة السوق الموازي",
+    statSquareMinMax: "أدنى/أقصى الموازي", statOfficialMinMax: "أدنى/أقصى الرسمي", periodHint: "خلال الفترة",
+  },
+};
+
 const fmt = (n, d = 2) =>
   n == null || isNaN(n)
     ? "—"
-    : n.toLocaleString("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d });
+    : n.toLocaleString(CURRENT_LOCALE, { minimumFractionDigits: d, maximumFractionDigits: d });
 const spread = (buy, off) => (buy && off ? ((buy - off) / off) * 100 : 0);
 
 // ═════════════════════════════════════════════════════════════
 //  GapBar — la signature : distance officiel ↔ Square
 // ═════════════════════════════════════════════════════════════
-function GapBar({ official, square, big }) {
+function GapBar({ official, square, big, t }) {
   if (!official || !square) return null;
   const RIGHT = 92;
   const offPos = Math.max(6, (official / square) * RIGHT);
@@ -76,19 +190,19 @@ function GapBar({ official, square, big }) {
         <span className="gap-badge" style={{ left: `${(offPos + RIGHT) / 2}%` }}>+{pct.toFixed(1)}%</span>
       </div>
       <div className="gap-legend">
-        <span className="gl"><i className="sw off" />Officiel <b className="num">{fmt(official)}</b></span>
+        <span className="gl"><i className="sw off" />{t.thOfficial} <b className="num">{fmt(official)}</b></span>
         <span className="gl gl-r"><b className="num">{fmt(square)}</b> Square<i className="sw st" /></span>
       </div>
     </div>
   );
 }
 
-function MiniGap({ pct }) {
+function MiniGap({ pct, t }) {
   const w = Math.min(100, Math.max(2, pct));
   return (
     <div className="mini">
       <div className="mini-track"><span className="mini-fill" style={{ width: `${w}%` }} /></div>
-      <span className="mini-lbl">écart <b>{pct.toFixed(1)}%</b></span>
+      <span className="mini-lbl">{t.gapWord} <b>{pct.toFixed(1)}%</b></span>
     </div>
   );
 }
@@ -128,7 +242,7 @@ function ChangeChip({ pct }) {
 // ═════════════════════════════════════════════════════════════
 //  Convertisseur
 // ═════════════════════════════════════════════════════════════
-function Converter({ rows }) {
+function Converter({ rows, t, lang }) {
   const [amount, setAmount] = useState("100");
   const [code, setCode] = useState("EUR");
   const [mode, setMode] = useState("square");
@@ -153,32 +267,32 @@ function Converter({ rows }) {
   return (
     <div className="conv">
       <div className="conv-head">
-        <span className="conv-title">Convertisseur</span>
+        <span className="conv-title">{t.convTitle}</span>
         <div className="seg">
           <button className={mode === "square" ? "on st" : ""} onClick={() => setMode("square")}>Square</button>
-          <button className={mode === "official" ? "on off" : ""} onClick={() => setMode("official")}>Officiel</button>
+          <button className={mode === "official" ? "on off" : ""} onClick={() => setMode("official")}>{t.convOfficial}</button>
         </div>
       </div>
 
       <div className="conv-io">
         <span className="conv-side">{inUnit}</span>
         <input className="conv-amount num" type="number" min="0" value={amount}
-          onChange={(e) => setAmount(e.target.value)} aria-label="Montant" />
+          onChange={(e) => setAmount(e.target.value)} aria-label={t.amountAria} />
         {dir === "fwd" && (
-          <select className="conv-select" value={code} onChange={(e) => setCode(e.target.value)} aria-label="Devise">
+          <select className="conv-select" value={code} onChange={(e) => setCode(e.target.value)} aria-label={t.currencyAria}>
             {visibleRows.map((r) => <option key={r.code} value={r.code}>{r.code}</option>)}
           </select>
         )}
       </div>
 
-      <button className="conv-swap" onClick={() => setDir(dir === "fwd" ? "inv" : "fwd")} aria-label="Inverser le sens">⇅</button>
+      <button className="conv-swap" onClick={() => setDir(dir === "fwd" ? "inv" : "fwd")} aria-label={t.swapAria}>⇅</button>
 
       <div className="conv-out">
-        <button className="conv-copy" onClick={copy} title="Copier">{copied ? "✓" : "⧉"}</button>
+        <button className="conv-copy" onClick={copy} title={t.copyTitle}>{copied ? "✓" : "⧉"}</button>
         <span className="conv-num num">{fmt(result)}</span>
         <span className="conv-unit">{outUnit}</span>
         {dir === "inv" && (
-          <select className="conv-select conv-select-out" value={code} onChange={(e) => setCode(e.target.value)} aria-label="Devise">
+          <select className="conv-select conv-select-out" value={code} onChange={(e) => setCode(e.target.value)} aria-label={t.currencyAria}>
             {visibleRows.map((r) => <option key={r.code} value={r.code}>{r.code}</option>)}
           </select>
         )}
@@ -186,19 +300,19 @@ function Converter({ rows }) {
 
       <div className="conv-chips">
         {[100, 500, 1000, 5000].map((v) => (
-          <button key={v} className={amount === String(v) ? "on" : ""} onClick={() => setAmount(String(v))}>{v.toLocaleString("fr-FR")}</button>
+          <button key={v} className={amount === String(v) ? "on" : ""} onClick={() => setAmount(String(v))}>{v.toLocaleString(CURRENT_LOCALE)}</button>
         ))}
       </div>
 
       <div className="conv-note">
-        1 {code} = <b className="num">{fmt(rate)}</b> DZD · {mode === "square" ? "taux Square (vente)" : "taux officiel"}
+        1 {code} = <b className="num">{fmt(rate)}</b> DZD · {mode === "square" ? t.convNoteSquare : t.convNoteOfficial}
       </div>
     </div>
   );
 }
 
 // ═════════════════════════════════════════════════════════════
-function RateCard({ r, active, onClick }) {
+function RateCard({ r, active, onClick, t }) {
   const sp = r.hasSquare ? spread(r.buy, r.official) : 0;
   return (
     <button className={`card ${active ? "card-active" : ""} ${!r.hasSquare ? "card-offonly" : ""}`} onClick={onClick}>
@@ -208,39 +322,39 @@ function RateCard({ r, active, onClick }) {
           <span className="card-code">{r.code}</span>
           <span className="card-name">{r.name}</span>
         </div>
-        {r.hasSquare ? <ChangeChip pct={r.change?.square} /> : <span className="off-badge">Officiel</span>}
+        {r.hasSquare ? <ChangeChip pct={r.change?.square} /> : <span className="off-badge">{t.thOfficial}</span>}
       </div>
-      {r.hasSquare ? <MiniGap pct={sp} /> : <div className="off-only-row"><span className="off-lbl">Officiel</span><span className="val num val-off">{fmt(r.official)}</span><span className="off-lbl-dzd">DZD</span></div>}
+      {r.hasSquare ? <MiniGap pct={sp} t={t} /> : <div className="off-only-row"><span className="off-lbl">{t.thOfficial}</span><span className="val num val-off">{fmt(r.official)}</span><span className="off-lbl-dzd">DZD</span></div>}
       {r.hasSquare && (
         <div className="card-rates">
-          <div><span className="lbl st-lbl">Achat</span><span className="val num">{fmt(r.buy)}</span></div>
-          <div><span className="lbl st-lbl">Vente</span><span className="val num">{fmt(r.sell)}</span></div>
-          <div><span className="lbl off-lbl">Officiel</span><span className="val num val-off">{fmt(r.official)}</span></div>
+          <div><span className="lbl st-lbl">{t.thBuy}</span><span className="val num">{fmt(r.buy)}</span></div>
+          <div><span className="lbl st-lbl">{t.thSell}</span><span className="val num">{fmt(r.sell)}</span></div>
+          <div><span className="lbl off-lbl">{t.thOfficial}</span><span className="val num val-off">{fmt(r.official)}</span></div>
         </div>
       )}
     </button>
   );
 }
 
-function MetalCard({ m }) {
+function MetalCard({ m, t }) {
   return (
     <div className="metal-card">
       <div className="metal-top">
         <span className="metal-ico">{m.symbol}</span>
         <div className="card-id">
           <span className="card-code">{m.name}</span>
-          <span className="card-name">{m.code} · once troy = {OZ_TO_G.toFixed(2)} g</span>
+          <span className="card-name">{m.code} · {t.troyOz} = {OZ_TO_G.toFixed(2)} g</span>
         </div>
         <ChangeChip pct={m.change} />
       </div>
       <div className="metal-rates">
         <div className="metal-main">
-          <span className="lbl off-lbl">DZD / gramme</span>
+          <span className="lbl off-lbl">{t.perGram}</span>
           <span className="val num metal-big">{fmt(m.dzdGram)}</span>
         </div>
         <div className="metal-sub">
-          <span><span className="lbl">DZD / once</span><span className="val num">{fmt(m.dzdOz, 0)}</span></span>
-          <span><span className="lbl">USD / once</span><span className="val num">{fmt(m.usdOz)}</span></span>
+          <span><span className="lbl">{t.perOz}</span><span className="val num">{fmt(m.dzdOz, 0)}</span></span>
+          <span><span className="lbl">{t.usdPerOz}</span><span className="val num">{fmt(m.usdOz)}</span></span>
         </div>
       </div>
     </div>
@@ -257,7 +371,7 @@ function Stat({ label, value, hint }) {
   );
 }
 
-function Detail({ r }) {
+function Detail({ r, t }) {
   if (!r) return null;
   const sp = r.hasSquare ? spread(r.buy, r.official) : 0;
   const offSeries = r.offHist?.length > 1 ? r.offHist : [];
@@ -275,36 +389,36 @@ function Detail({ r }) {
         <img src={r.flag} alt="" className="flag flag-lg" />
         <div className="detail-title">
           <h3>{r.code}<span className="slash">/</span>DZD</h3>
-          <span className="detail-sub">{r.name} · {r.hasSquare ? "marché parallèle vs officiel" : "taux officiel uniquement"}</span>
+          <span className="detail-sub">{r.name} · {r.hasSquare ? t.detailParallel : t.detailOfficialOnly}</span>
         </div>
         <div className="detail-now">
           <span className="detail-now-num num">{r.hasSquare ? fmt(r.buy) : fmt(r.official)}</span>
-          <span className="detail-now-tag">{r.hasSquare ? `écart +${sp.toFixed(2)}%` : "Frankfurter"}</span>
+          <span className="detail-now-tag">{r.hasSquare ? `${t.gapWord} +${sp.toFixed(2)}%` : "Frankfurter"}</span>
         </div>
       </div>
 
-      {r.hasSquare && <GapBar official={r.official} square={r.buy} big />}
+      {r.hasSquare && <GapBar official={r.official} square={r.buy} big t={t} />}
 
       <div className="detail-chart-wrap">
         <div className="chart-legend">
-          <span><i className="sw off" /> Officiel <small>(temps réel)</small></span>
-          {r.hasSquare && <span><i className="sw st" /> Square <small>(saisi)</small></span>}
+          <span><i className="sw off" /> {t.chartOfficial} <small>{t.chartRealtime}</small></span>
+          {r.hasSquare && <span><i className="sw st" /> Square <small>{t.chartEntered}</small></span>}
         </div>
         <div className="detail-chart">
           {(offSeries.length > 1 || sqSeries.length > 1)
             ? <TwoLineChart off={offSeries} sq={sqSeries} />
-            : <div className="chart-empty">Historique en cours de constitution.</div>}
+            : <div className="chart-empty">{t.chartEmpty}</div>}
         </div>
-        <div className="chart-x"><span>il y a ~6 sem.</span><span>aujourd'hui</span></div>
+        <div className="chart-x"><span>{t.chartXAgo}</span><span>{t.chartXToday}</span></div>
       </div>
 
       <div className="detail-grid">
-        {r.hasSquare && <Stat label="Achat Square" value={`${fmt(r.buy)}`} hint="DZD" />}
-        {r.hasSquare && <Stat label="Vente Square" value={`${fmt(r.sell)}`} hint="DZD" />}
-        <Stat label="Officiel" value={`${fmt(r.official)}`} hint="DZD · réf. banques centrales" />
-        {r.hasSquare && <Stat label="Écart vs officiel" value={`+${sp.toFixed(2)}%`} hint="prime du marché parallèle" />}
-        {ss && <Stat label="Square min / max" value={`${fmt(ss.min)} – ${fmt(ss.max)}`} hint="sur la période" />}
-        {so && <Stat label="Officiel min / max" value={`${fmt(so.min)} – ${fmt(so.max)}`} hint="sur la période" />}
+        {r.hasSquare && <Stat label={t.statBuySquare} value={`${fmt(r.buy)}`} hint="DZD" />}
+        {r.hasSquare && <Stat label={t.statSellSquare} value={`${fmt(r.sell)}`} hint="DZD" />}
+        <Stat label={t.thOfficial} value={`${fmt(r.official)}`} hint={t.statOfficialHint} />
+        {r.hasSquare && <Stat label={t.statGapVsOfficial} value={`+${sp.toFixed(2)}%`} hint={t.statGapHint} />}
+        {ss && <Stat label={t.statSquareMinMax} value={`${fmt(ss.min)} – ${fmt(ss.max)}`} hint={t.periodHint} />}
+        {so && <Stat label={t.statOfficialMinMax} value={`${fmt(so.min)} – ${fmt(so.max)}`} hint={t.periodHint} />}
       </div>
     </div>
   );
@@ -336,6 +450,18 @@ export default function App() {
   useEffect(() => {
     try { localStorage.setItem("dt-theme", theme); } catch {}
   }, [theme]);
+
+  const [lang, setLang] = useState(() => {
+    try { return localStorage.getItem("dt-lang") || "fr"; } catch { return "fr"; }
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem("dt-lang", lang); } catch {}
+    try { document.documentElement.lang = lang; document.documentElement.dir = lang === "ar" ? "rtl" : "ltr"; } catch {}
+  }, [lang]);
+
+  const t = STRINGS[lang];
+  CURRENT_LOCALE = LOCALE_MAP[lang];
 
   const load = useCallback(async () => {
     setStatus("loading");
@@ -408,7 +534,7 @@ export default function App() {
       if (!metalsRef.current) { metalsRef.current = FALLBACK_METALS; setMetals(FALLBACK_METALS); }
     }
 
-    setFetchedAt(new Date().toLocaleString("fr-FR", { hour: "2-digit", minute: "2-digit" }));
+    setFetchedAt(new Date().toLocaleString(CURRENT_LOCALE, { hour: "2-digit", minute: "2-digit" }));
     setStatus(offOk && sqOk ? "ok" : offOk || sqOk ? "partial" : "error");
     firstLoad.current = false;
   }, []);
@@ -429,14 +555,14 @@ export default function App() {
       const sH = hasSquare ? (square.history?.[c] || []).map((p) => ({ d: p.d, v: p.buy })) : [];
       const chg = (arr) => arr.length >= 2 ? ((arr[arr.length - 1].v - arr[arr.length - 2].v) / arr[arr.length - 2].v) * 100 : null;
       return {
-        code: c, name: META[c].name, flag: META[c].flag,
+        code: c, name: META_NAMES[lang][c], flag: META[c].flag,
         buy: hasSquare ? (sq.buy ?? null) : null,
         sell: hasSquare ? (sq.sell ?? null) : null,
         official: off, offHist: oH, sqHist: sH, hasSquare,
         change: { official: chg(oH), square: hasSquare ? chg(sH) : null },
       };
     });
-  }, [square, official, offHist]);
+  }, [square, official, offHist, lang]);
 
   const metalRows = useMemo(() => {
     if (!metals || !official) return [];
@@ -448,9 +574,9 @@ export default function App() {
       const dzdOz = usdOz * usdDzd;
       const dzdGram = dzdOz / OZ_TO_G;
       const change = prevUsdOz ? ((usdOz - prevUsdOz) / prevUsdOz) * 100 : null;
-      return { code, ...METALS_META[code], usdOz, dzdOz, dzdGram, change };
+      return { code, ...METALS_META[code], name: METALS_NAMES[lang][code], usdOz, dzdOz, dzdGram, change };
     });
-  }, [metals, prevMetals, official]);
+  }, [metals, prevMetals, official, lang]);
 
   const squareRows = rows.filter((r) => r.hasSquare);
   const active = rows.find((r) => r.code === activeCode);
@@ -466,7 +592,7 @@ export default function App() {
   }, [rows, squareRows, square]);
 
   return (
-    <div className="root" data-theme={theme}>
+    <div className="root" data-theme={theme} dir={lang === "ar" ? "rtl" : "ltr"}>
       <style>{CSS}</style>
 
       <div className="ticker">
@@ -486,7 +612,7 @@ export default function App() {
                   )}
                 </span>
               ))
-            : <span className="ticker-item">Chargement des taux…</span>}
+            : <span className="ticker-item">{t.tickerLoading}</span>}
         </div>
       </div>
 
@@ -507,21 +633,26 @@ export default function App() {
           </div>
           <div>
             <span className="brand-name">DinarTaux</span>
-            <span className="brand-sub">Square &amp; taux officiel · Algérie</span>
+            <span className="brand-sub">{t.brandSub}</span>
           </div>
         </div>
         <div className="head-meta">
           <span className={`live ${status === "loading" ? "load" : status === "error" ? "err" : ""}`}>
-            <i /> {status === "loading" ? "Mise à jour…" : status === "error" ? "Hors ligne" : "En direct"}
+            <i /> {status === "loading" ? t.liveUpdating : status === "error" ? t.liveOffline : t.liveOnline}
           </span>
           <span className="clock">
-            <span className="clock-text">{fetchedAt ? `Actualisé ${fetchedAt}` : "—"}</span>
-            <button className="refresh" onClick={load} title="Rafraîchir">↻</button>
+            <span className="clock-text">{fetchedAt ? `${t.refreshedPrefix} ${fetchedAt}` : "—"}</span>
+            <button className="refresh" onClick={load} title={t.refreshTitle}>↻</button>
+            <div className="lang-switch" role="group" aria-label={t.langAria}>
+              {["fr", "en", "ar"].map((lg) => (
+                <button key={lg} className={lang === lg ? "on" : ""} onClick={() => setLang(lg)}>{lg.toUpperCase()}</button>
+              ))}
+            </div>
             <button
               className="theme-toggle"
-              onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
-              title={theme === "dark" ? "Passer en mode clair" : "Passer en mode sombre"}
-              aria-label="Changer de thème"
+              onClick={() => setTheme((th) => (th === "dark" ? "light" : "dark"))}
+              title={theme === "dark" ? t.themeToLight : t.themeToDark}
+              aria-label={t.themeAria}
             >
               {theme === "dark" ? "☀" : "🌙"}
             </button>
@@ -531,11 +662,11 @@ export default function App() {
 
       <section className="hero">
         <div className="hero-left">
-          <span className="eyebrow">Marché du dinar · Square vs officiel</span>
-          <h1>Le vrai prix<br />du <span>dinar</span></h1>
+          <span className="eyebrow">{t.eyebrow}</span>
+          <h1>{t.heroTitle1}<br />{t.heroTitle2Pre}<span>{t.heroTitle2Word}</span></h1>
           <p>
-            L'écart entre le cours <b className="t-off">officiel</b> et le taux <b className="t-st">Square</b>
-            {" "}du marché parallèle, en un coup d'œil. Officiel en temps réel, Square saisi et vérifié.
+            {t.heroP1}<b className="t-off">{t.heroPOff}</b>{t.heroP2}<b className="t-st">{t.heroPSt}</b>
+            {t.heroP3}
           </p>
           {active && active.hasSquare && (
             <div className="hero-gap-card">
@@ -544,53 +675,53 @@ export default function App() {
                 <span className="hgc-code">{active.code}/DZD</span>
                 <ChangeChip pct={active.change?.square} />
               </div>
-              <GapBar official={active.official} square={active.buy} big />
+              <GapBar official={active.official} square={active.buy} big t={t} />
             </div>
           )}
           {stats && (
             <div className="hero-stats">
-              <Stat label="Écart moyen" value={`${stats.avg.toFixed(1)}%`} />
-              <Stat label="Plus grand écart" value={`${stats.max.toFixed(0)}%`} hint={stats.maxCode} />
-              <Stat label="Devises" value={stats.count} />
-              <Stat label="Maj Square" value={stats.updated?.slice(5) || "—"} hint={stats.updated?.slice(0, 4)} />
+              <Stat label={t.statAvgGap} value={`${stats.avg.toFixed(1)}%`} />
+              <Stat label={t.statMaxGap} value={`${stats.max.toFixed(0)}%`} hint={stats.maxCode} />
+              <Stat label={t.statCurrencies} value={stats.count} />
+              <Stat label={t.statSquareUpdate} value={stats.updated?.slice(5) || "—"} hint={stats.updated?.slice(0, 4)} />
             </div>
           )}
         </div>
-        <Converter rows={rows} />
+        <Converter rows={rows} t={t} lang={lang} />
       </section>
 
       {square && (
         <div className={`srcbar ${warn ? "warn" : ""}`}>
-          {warn ? <>⚠ {warn}</> : <>✓ Square saisi le <b>{square.updated}</b> · officiel en temps réel (Frankfurter) · l'historique se construit chaque jour</>}
+          {warn ? <>⚠ {warn}</> : <>✓ {t.srcbarOkPre} <b>{square.updated}</b>{t.srcbarOkPost}</>}
         </div>
       )}
 
       <section className="section">
-        <div className="section-head"><h2>Taux indicatifs</h2><span className="muted">Cliquez pour les détails</span></div>
+        <div className="section-head"><h2>{t.sectionRatesTitle}</h2><span className="muted">{t.sectionRatesSub}</span></div>
         <div className="cards">
           {rows.length
-            ? rows.map((r) => <RateCard key={r.code} r={r} active={r.code === activeCode} onClick={() => setActiveCode(r.code)} />)
+            ? rows.map((r) => <RateCard key={r.code} r={r} active={r.code === activeCode} onClick={() => setActiveCode(r.code)} t={t} />)
             : [0, 1, 2, 3].map((i) => <div key={i} className="card skeleton" />)}
         </div>
       </section>
 
-      {active && <section className="section"><Detail r={active} /></section>}
+      {active && <section className="section"><Detail r={active} t={t} /></section>}
 
       <section className="section">
-        <div className="section-head"><h2>Métaux précieux</h2><span className="muted">Or &amp; argent · spot temps réel</span></div>
+        <div className="section-head"><h2>{t.sectionMetalsTitle}</h2><span className="muted">{t.sectionMetalsSub}</span></div>
         <div className="metal-cards">
           {metalRows.length
-            ? metalRows.map((m) => <MetalCard key={m.code} m={m} />)
+            ? metalRows.map((m) => <MetalCard key={m.code} m={m} t={t} />)
             : [0, 1].map((i) => <div key={i} className="metal-card skeleton" />)}
         </div>
       </section>
 
       <section className="section">
-        <div className="section-head"><h2>Tableau comparatif</h2><span className="muted">Square vs officiel</span></div>
+        <div className="section-head"><h2>{t.sectionTableTitle}</h2><span className="muted">{t.sectionTableSub}</span></div>
         <div className="table-wrap">
           <table className="tbl">
             <thead>
-              <tr><th>Devise</th><th className="th-st">Achat</th><th className="th-st">Vente</th><th className="th-off">Officiel</th><th>Écart</th><th>24h</th></tr>
+              <tr><th>{t.thCurrency}</th><th className="th-st">{t.thBuy}</th><th className="th-st">{t.thSell}</th><th className="th-off">{t.thOfficial}</th><th>{t.thGap}</th><th>{t.th24h}</th></tr>
             </thead>
             <tbody>
               {rows.map((r) => (
@@ -614,15 +745,13 @@ export default function App() {
       <section className="notice">
         <span className="notice-icon">⚠</span>
         <p>
-          Taux <b>indicatifs</b>, pas une offre de change. L'« officiel » est une référence de marché
-          (banques centrales) très proche du cours de la Banque d'Algérie sans en être strictement identique.
-          Le « Square » reflète le marché parallèle et est saisi manuellement. Vérifiez avant toute opération.
+          {t.noticePre}<b>{t.noticeB}</b>{t.noticePost}
         </p>
       </section>
 
       <footer className="foot">
-        <span>© 2026 DinarTaux · Intelligence économique Algérie</span>
-        <span className="foot-upd">Officiel : Frankfurter · Square : saisie vérifiée</span>
+        <span>{t.footerCopy}</span>
+        <span className="foot-upd">{t.footerUpd}</span>
       </footer>
     </div>
   );
@@ -644,9 +773,22 @@ const CSS = `
     radial-gradient(1000px 520px at 6% 2%, rgba(106,160,255,.10), transparent 56%),
     var(--bg);
   color:var(--text);
-  font-family:'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  font-family:'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',Tahoma,Arial,sans-serif;
   min-height:100vh;padding-bottom:44px;
 }
+.root[dir="rtl"]{direction:rtl;text-align:right}
+.root[dir="rtl"] .gap,.root[dir="rtl"] .gap-track,.root[dir="rtl"] .mini,.root[dir="rtl"] .mini-track,
+.root[dir="rtl"] .tlc,.root[dir="rtl"] .ticker-track,.root[dir="rtl"] .ticker-item,
+.root[dir="rtl"] .conv-io,.root[dir="rtl"] .conv-out,.root[dir="rtl"] .td-cur,.root[dir="rtl"] .num{direction:ltr}
+.root[dir="rtl"] .gap-legend,.root[dir="rtl"] .chart-legend,.root[dir="rtl"] .chart-x{direction:rtl}
+.root[dir="rtl"] .head{flex-direction:row-reverse}
+.root[dir="rtl"] .head-meta{align-items:flex-start}
+.root[dir="rtl"] .hero p{margin-right:0}
+.root[dir="rtl"] .tbl th,.root[dir="rtl"] .tbl td{text-align:right}
+.root[dir="rtl"] .td-cur{justify-content:flex-end}
+.root[dir="rtl"] .conv-copy{margin-right:0;margin-left:auto;order:0}
+.root[dir="rtl"] .notice{flex-direction:row-reverse}
+.root[dir="rtl"] .foot{flex-direction:row-reverse}
 .root[data-theme="light"]{
   --bg:#F6F7FB;--bg2:#FFFFFF;--surface:#FFFFFF;--surface2:#F0F2F8;--line:#E1E5F0;
   --text:#161A2A;--dim:#5C6478;--mute:#8A92A6;
@@ -696,6 +838,10 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .refresh:hover{color:var(--off);border-color:var(--off)}
 .theme-toggle{background:var(--surface);border:1px solid var(--line);color:var(--dim);width:23px;height:23px;border-radius:6px;cursor:pointer;font-size:12px;line-height:1;transition:.15s;display:grid;place-items:center}
 .theme-toggle:hover{color:var(--st);border-color:var(--st)}
+.lang-switch{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:2px;gap:2px}
+.lang-switch button{border:0;background:transparent;color:var(--dim);font-size:10px;font-weight:700;letter-spacing:.03em;padding:3px 6px;border-radius:5px;cursor:pointer;font-family:inherit;transition:.15s}
+.lang-switch button:hover{color:var(--text)}
+.lang-switch button.on{background:var(--off);color:#06101f}
 
 /* Hero */
 .hero{max-width:1120px;margin:10px auto 0;padding:28px 24px 8px;display:grid;grid-template-columns:1.3fr .9fr;gap:38px;align-items:start;animation:fadeUp .6s ease both}
