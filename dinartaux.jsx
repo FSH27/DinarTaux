@@ -7,6 +7,14 @@ const SQUARE_URL =
   "https://raw.githubusercontent.com/FSH27/DinarTaux/main/square-rates.json";
 
 const OFFICIAL_API = "https://api.frankfurter.dev/v2";
+const METALS_API = "https://api.gold-api.com/price";
+const OZ_TO_G = 31.1034768;
+
+const METALS_META = {
+  XAU: { name: "Or", unit: "g", flag: null, symbol: "🥇" },
+  XAG: { name: "Argent", unit: "g", flag: null, symbol: "🥈" },
+};
+const FALLBACK_METALS = { XAU: 4327.3, XAG: 70.62 }; // USD / once troy
 
 // Currencies with Square (parallel market) rates
 const SQUARE_CODES = ["EUR", "USD", "GBP", "CAD"];
@@ -214,6 +222,31 @@ function RateCard({ r, active, onClick }) {
   );
 }
 
+function MetalCard({ m }) {
+  return (
+    <div className="metal-card">
+      <div className="metal-top">
+        <span className="metal-ico">{m.symbol}</span>
+        <div className="card-id">
+          <span className="card-code">{m.name}</span>
+          <span className="card-name">{m.code} · once troy = {OZ_TO_G.toFixed(2)} g</span>
+        </div>
+        <ChangeChip pct={m.change} />
+      </div>
+      <div className="metal-rates">
+        <div className="metal-main">
+          <span className="lbl off-lbl">DZD / gramme</span>
+          <span className="val num metal-big">{fmt(m.dzdGram)}</span>
+        </div>
+        <div className="metal-sub">
+          <span><span className="lbl">DZD / once</span><span className="val num">{fmt(m.dzdOz, 0)}</span></span>
+          <span><span className="lbl">USD / once</span><span className="val num">{fmt(m.usdOz)}</span></span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Stat({ label, value, hint }) {
   return (
     <div className="stat">
@@ -284,11 +317,25 @@ export default function App() {
   const [official, setOfficial] = useState(null);
   const [offHist, setOffHist] = useState({});
   const [square, setSquare] = useState(null);
+  const [metals, setMetals] = useState(null);
+  const [prevMetals, setPrevMetals] = useState(null);
+  const metalsRef = useRef(null);
   const [status, setStatus] = useState("loading");
   const [warn, setWarn] = useState("");
   const [activeCode, setActiveCode] = useState("EUR");
   const [fetchedAt, setFetchedAt] = useState("");
   const firstLoad = useRef(true);
+  const [theme, setTheme] = useState(() => {
+    try {
+      const saved = localStorage.getItem("dt-theme");
+      if (saved) return saved;
+      return window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark";
+    } catch { return "dark"; }
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem("dt-theme", theme); } catch {}
+  }, [theme]);
 
   const load = useCallback(async () => {
     setStatus("loading");
@@ -345,6 +392,22 @@ export default function App() {
       setWarn("Taux Square : source distante injoignable — valeurs de secours affichées.");
     }
 
+    // Or & argent (gold-api.com — gratuit, sans clé, USD/once troy)
+    try {
+      const [xauR, xagR] = await Promise.all([
+        fetch(`${METALS_API}/XAU`),
+        fetch(`${METALS_API}/XAG`),
+      ]);
+      if (!xauR.ok || !xagR.ok) throw new Error("metals");
+      const [xau, xag] = await Promise.all([xauR.json(), xagR.json()]);
+      setPrevMetals(metalsRef.current);
+      const next = { XAU: xau.price, XAG: xag.price };
+      metalsRef.current = next;
+      setMetals(next);
+    } catch {
+      if (!metalsRef.current) { metalsRef.current = FALLBACK_METALS; setMetals(FALLBACK_METALS); }
+    }
+
     setFetchedAt(new Date().toLocaleString("fr-FR", { hour: "2-digit", minute: "2-digit" }));
     setStatus(offOk && sqOk ? "ok" : offOk || sqOk ? "partial" : "error");
     firstLoad.current = false;
@@ -375,6 +438,20 @@ export default function App() {
     });
   }, [square, official, offHist]);
 
+  const metalRows = useMemo(() => {
+    if (!metals || !official) return [];
+    const usdDzd = official.USD;
+    if (!usdDzd) return [];
+    return Object.keys(METALS_META).map((code) => {
+      const usdOz = metals[code];
+      const prevUsdOz = prevMetals?.[code];
+      const dzdOz = usdOz * usdDzd;
+      const dzdGram = dzdOz / OZ_TO_G;
+      const change = prevUsdOz ? ((usdOz - prevUsdOz) / prevUsdOz) * 100 : null;
+      return { code, ...METALS_META[code], usdOz, dzdOz, dzdGram, change };
+    });
+  }, [metals, prevMetals, official]);
+
   const squareRows = rows.filter((r) => r.hasSquare);
   const active = rows.find((r) => r.code === activeCode);
   const stats = useMemo(() => {
@@ -389,7 +466,7 @@ export default function App() {
   }, [rows, squareRows, square]);
 
   return (
-    <div className="root">
+    <div className="root" data-theme={theme}>
       <style>{CSS}</style>
 
       <div className="ticker">
@@ -415,7 +492,19 @@ export default function App() {
 
       <header className="head">
         <div className="brand">
-          <div className="logo"><span>د</span></div>
+          <div className="logo" aria-hidden="true">
+            <svg viewBox="0 0 44 44" width="44" height="44">
+              <defs>
+                <linearGradient id="logoGrad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stopColor="var(--st)" />
+                  <stop offset="1" stopColor="var(--off-deep)" />
+                </linearGradient>
+              </defs>
+              <rect width="44" height="44" rx="13" fill="url(#logoGrad)" />
+              <circle cx="22" cy="22" r="14" fill="none" stroke="rgba(10,10,10,.28)" strokeWidth="1.6" strokeDasharray="2.4 3.4" />
+              <text x="22" y="29.5" textAnchor="middle" fontSize="19" fontWeight="700" fill="#0a0a0a" fontFamily="'Bricolage Grotesque',sans-serif">د</text>
+            </svg>
+          </div>
           <div>
             <span className="brand-name">DinarTaux</span>
             <span className="brand-sub">Square &amp; taux officiel · Algérie</span>
@@ -426,8 +515,16 @@ export default function App() {
             <i /> {status === "loading" ? "Mise à jour…" : status === "error" ? "Hors ligne" : "En direct"}
           </span>
           <span className="clock">
-            {fetchedAt ? `Actualisé ${fetchedAt}` : "—"}
+            <span className="clock-text">{fetchedAt ? `Actualisé ${fetchedAt}` : "—"}</span>
             <button className="refresh" onClick={load} title="Rafraîchir">↻</button>
+            <button
+              className="theme-toggle"
+              onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+              title={theme === "dark" ? "Passer en mode clair" : "Passer en mode sombre"}
+              aria-label="Changer de thème"
+            >
+              {theme === "dark" ? "☀" : "🌙"}
+            </button>
           </span>
         </div>
       </header>
@@ -478,6 +575,15 @@ export default function App() {
       </section>
 
       {active && <section className="section"><Detail r={active} /></section>}
+
+      <section className="section">
+        <div className="section-head"><h2>Métaux précieux</h2><span className="muted">Or &amp; argent · spot temps réel</span></div>
+        <div className="metal-cards">
+          {metalRows.length
+            ? metalRows.map((m) => <MetalCard key={m.code} m={m} />)
+            : [0, 1].map((i) => <div key={i} className="metal-card skeleton" />)}
+        </div>
+      </section>
 
       <section className="section">
         <div className="section-head"><h2>Tableau comparatif</h2><span className="muted">Square vs officiel</span></div>
@@ -541,6 +647,20 @@ const CSS = `
   font-family:'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   min-height:100vh;padding-bottom:44px;
 }
+.root[data-theme="light"]{
+  --bg:#F6F7FB;--bg2:#FFFFFF;--surface:#FFFFFF;--surface2:#F0F2F8;--line:#E1E5F0;
+  --text:#161A2A;--dim:#5C6478;--mute:#8A92A6;
+  --off:#3D6FD6;--off-deep:#2A52A8;
+  --st:#C97D12;--st-deep:#9C6209;
+  --up:#1B9E6B;--down:#D43A57;
+  background:
+    radial-gradient(1200px 560px at 84% -10%, rgba(201,125,18,.07), transparent 58%),
+    radial-gradient(1000px 520px at 6% 2%, rgba(61,111,214,.08), transparent 56%),
+    var(--bg);
+}
+.root[data-theme="light"] .ticker{background:rgba(255,255,255,.75)}
+.root[data-theme="light"] .conv{box-shadow:0 20px 50px -20px rgba(40,50,90,.18)}
+.root[data-theme="light"] .logo circle{stroke:rgba(255,255,255,.45)}
 .root h1,.root h2,.root h3{font-family:'Bricolage Grotesque','Geist',sans-serif;letter-spacing:-.02em}
 .num{font-family:var(--mono);font-variant-numeric:tabular-nums;font-feature-settings:'tnum' 1}
 .t-off{color:var(--off)}.t-st{color:var(--st)}
@@ -561,8 +681,8 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 /* Head */
 .head{max-width:1120px;margin:0 auto;padding:22px 24px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:13px}
-.logo{width:44px;height:44px;border-radius:13px;background:linear-gradient(140deg,var(--st),var(--off-deep));display:grid;place-items:center;font-size:22px;color:#0a0a0a;box-shadow:0 8px 24px -6px rgba(247,178,59,.4);font-weight:700}
-.logo span{transform:translateY(-1px)}
+.logo{width:44px;height:44px;border-radius:13px;display:grid;place-items:center;box-shadow:0 8px 24px -6px rgba(247,178,59,.4);flex-shrink:0}
+.logo svg{display:block;border-radius:13px}
 .brand-name{display:block;font-family:'Bricolage Grotesque';font-weight:700;font-size:19px}
 .brand-sub{display:block;font-size:12px;color:var(--dim)}
 .head-meta{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
@@ -574,6 +694,8 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .clock{font-size:12px;color:var(--mute);display:flex;align-items:center;gap:7px}
 .refresh{background:var(--surface);border:1px solid var(--line);color:var(--dim);width:23px;height:23px;border-radius:6px;cursor:pointer;font-size:13px;transition:.15s}
 .refresh:hover{color:var(--off);border-color:var(--off)}
+.theme-toggle{background:var(--surface);border:1px solid var(--line);color:var(--dim);width:23px;height:23px;border-radius:6px;cursor:pointer;font-size:12px;line-height:1;transition:.15s;display:grid;place-items:center}
+.theme-toggle:hover{color:var(--st);border-color:var(--st)}
 
 /* Hero */
 .hero{max-width:1120px;margin:10px auto 0;padding:28px 24px 8px;display:grid;grid-template-columns:1.3fr .9fr;gap:38px;align-items:start;animation:fadeUp .6s ease both}
@@ -686,6 +808,19 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .off-only-row{display:flex;align-items:baseline;gap:6px;padding:12px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin:8px 0}
 .off-lbl-dzd{font-size:10px;color:var(--mute)}
 
+/* Metal cards */
+.metal-cards{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.metal-card{background:linear-gradient(160deg,var(--surface2),var(--surface));border:1px solid var(--line);border-radius:17px;padding:18px}
+.metal-card.skeleton{height:128px;animation:sk 1.4s ease-in-out infinite;border-style:dashed}
+.metal-top{display:flex;align-items:center;gap:11px;margin-bottom:14px}
+.metal-ico{font-size:24px;line-height:1}
+.metal-rates{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;border-top:1px solid var(--line);padding-top:13px;flex-wrap:wrap}
+.metal-main{display:flex;flex-direction:column}
+.metal-big{font-size:24px;font-weight:700;color:var(--st)}
+.metal-sub{display:flex;gap:18px}
+.metal-sub .lbl{display:block;font-size:10px;color:var(--dim);margin-bottom:3px}
+.metal-sub .val{font-size:13px;font-weight:600}
+
 /* Detail */
 .detail{background:linear-gradient(160deg,var(--surface2),var(--surface));border:1px solid var(--line);border-radius:22px;padding:26px}
 .detail-head{display:flex;align-items:center;gap:15px;margin-bottom:6px}
@@ -740,10 +875,46 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 }
 @media(max-width:560px){
   .cards{grid-template-columns:1fr}
+  .metal-cards{grid-template-columns:1fr}
   .hero-stats{grid-template-columns:repeat(2,1fr)}
   .table-wrap{overflow-x:auto}.tbl{min-width:560px}
   .head-meta{align-items:flex-start}
   .detail-grid{grid-template-columns:1fr}
+  .detail-head{flex-wrap:wrap}
+  .detail-now{text-align:left}
+}
+@media(max-width:480px){
+  .root{overflow-x:hidden}
+  .head{padding:16px 16px}
+  .brand{gap:10px}
+  .logo{width:38px;height:38px}
+  .logo svg{width:38px;height:38px}
+  .brand-name{font-size:17px}
+  .hero{padding:20px 16px 6px;gap:22px}
+  .hero p{max-width:none}
+  .hero-gap-card{padding:16px}
+  .hero-stats{gap:8px}
+  .stat{padding:11px 12px}
+  .stat-val{font-size:17px}
+  .section{padding:0 16px;margin-top:26px}
+  .srcbar{padding:0 16px}
+  .foot{padding:20px 16px}
+  .conv{padding:16px;border-radius:18px}
+  .conv-amount{font-size:20px}
+  .conv-num{font-size:24px}
+  .conv-chips{flex-wrap:wrap}
+  .conv-chips button{flex:1 1 calc(50% - 4px)}
+  .detail{padding:18px}
+  .detail-head{gap:10px}
+  .detail-head h3{font-size:19px}
+  .detail-now-num{font-size:22px}
+  .card-rates{grid-template-columns:repeat(3,1fr);gap:4px}
+  .notice{padding:14px}
+  .gap-badge{font-size:11px;padding:2px 7px}
+}
+@media(max-width:380px){
+  .brand-sub{display:none}
+  .ticker-item{font-size:12px}
 }
 @media(prefers-reduced-motion:reduce){
   *{animation:none!important;transition:none!important}
