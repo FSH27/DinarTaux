@@ -761,6 +761,8 @@ const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Geist:wght@400;500;600&family=Geist+Mono:wght@500;600&display=swap');
 
 *{box-sizing:border-box;margin:0;padding:0}
+.root,.root *{min-width:0}
+.root img{max-width:100%}
 .root{
   --bg:#090C15;--bg2:#0E121D;--surface:#141926;--surface2:#1A2030;--line:#252D40;
   --text:#EEF1F8;--dim:#929DB4;--mute:#5A6479;
@@ -774,7 +776,7 @@ const CSS = `
     var(--bg);
   color:var(--text);
   font-family:'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',Tahoma,Arial,sans-serif;
-  min-height:100vh;padding-bottom:44px;
+  min-height:100vh;padding-bottom:44px;overflow-x:hidden;width:100%;
 }
 .root[dir="rtl"]{direction:rtl;text-align:right}
 .root[dir="rtl"] .gap,.root[dir="rtl"] .gap-track,.root[dir="rtl"] .mini,.root[dir="rtl"] .mini-track,
